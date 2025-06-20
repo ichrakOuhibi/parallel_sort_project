@@ -34,6 +34,3 @@ def prod_cons_sort():
     end = time.time()
 
     print(f"[Producteur/Consommateur] Temps d'exécution : {end - start:.4f} sec")
-
-if __name__ == "__main__":
-    prod_cons_sort()

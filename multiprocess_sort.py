@@ -1,39 +1,65 @@
 import numpy as np
 import time
-from multiprocessing import Process, Pipe
-import os
-from merge_utils import merge_sort
+import multiprocessing
+from merge_utils import merge_sort, merge
 
-def sort_in_process(arr, conn, idx):
-    pid = os.getpid()
-    print(f"➡️  Processus PID={pid} started for part {idx}")
-    merge_sort(arr, 0, len(arr) - 1)
-    print(f"✅ Processus PID={pid} finished for part {idx}")
-    conn.send(arr)
+def sort_in_process(sub_array, conn, index):
+    print(f"➡️  Processus PID={multiprocessing.current_process().pid} started for part {index}")
+    merge_sort(sub_array, 0, len(sub_array) - 1)
+    conn.send(sub_array)
     conn.close()
+    print(f"✅ Processus PID={multiprocessing.current_process().pid} finished for part {index}")
+
+def merge_two_sorted(a, b):
+    result = []
+    i = j = 0
+    while i < len(a) and j < len(b):
+        if a[i] < b[j]:
+            result.append(a[i])
+            i += 1
+        else:
+            result.append(b[j])
+            j += 1
+    result.extend(a[i:])
+    result.extend(b[j:])
+    return np.array(result)
 
 def multiprocess_sort(arr):
-    half = len(arr) // 2
-    A1, A2 = arr[:half], arr[half:]
+    size = len(arr)
+    nb_parts = 4
+    chunk_size = size // nb_parts
 
-    parent_conn1, child_conn1 = Pipe()
-    parent_conn2, child_conn2 = Pipe()
-
-    p1 = Process(target=sort_in_process, args=(A1, child_conn1, 1))
-    p2 = Process(target=sort_in_process, args=(A2, child_conn2, 2))
+    processes = []
+    pipes = []
+    sorted_parts = []
 
     start = time.time()
-    p1.start()
-    p2.start()
 
-    sorted1 = parent_conn1.recv()
-    sorted2 = parent_conn2.recv()
+    for i in range(nb_parts):
+        start_index = i * chunk_size
+        end_index = size if i == nb_parts - 1 else (i + 1) * chunk_size
+        sub_array = arr[start_index:end_index]
 
-    p1.join()
-    p2.join()
+        parent_conn, child_conn = multiprocessing.Pipe()
+        p = multiprocessing.Process(target=sort_in_process, args=(sub_array, child_conn, i))
+        processes.append(p)
+        pipes.append(parent_conn)
+        p.start()
 
-    merged = np.concatenate((sorted1, sorted2))
-    merge_sort(merged, 0, len(merged) - 1)
+    for i, conn in enumerate(pipes):
+        try:
+            part = conn.recv()
+            print(f"✅ Données reçues du processus {i}")
+            sorted_parts.append(part)
+        except Exception as e:
+            print(f"❌ Erreur réception pipe {i} : {e}")
+
+    for p in processes:
+        p.join()
+
+    merged = sorted_parts[0]
+    for i in range(1, len(sorted_parts)):
+        merged = merge_two_sorted(merged, sorted_parts[i])
 
     end = time.time()
     print(f"[MultiProcess + Pipe] Temps d'exécution : {end - start:.4f} sec")
