@@ -58,8 +58,8 @@ data = load_file_as_array("large_input.txt")
 measure("MonoProcess", sequential_sort, data.copy())
 measure("MultiProcess + Pipe", multiprocess_sort, data.copy())
 measure("MultiThread + Sémaphores", multithread_sort, data.copy())
-measure("Producteur / Consommateur", lambda _: prod_cons_sort(), None)
-#measure("Producteur / Consommateur", prod_cons_sort, None)
+#measure("Producteur / Consommateur", lambda _: prod_cons_sort(), None)
+measure("Producteur / Consommateur", prod_cons_sort, data.copy())
 
 # Résumé
 print("\n📊 Résumé Comparatif :")
